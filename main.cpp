@@ -8,6 +8,7 @@
 #include "TCS3472_I2C.h"
 #include "Si7021.h"
 #include "RGBLed.h"
+#include "MBed_Adafruit_GPS.h"
 
 /*****************VARIABLES**************************/
 //Sensors
@@ -19,6 +20,7 @@ I2C tempSensor(PB_9, PB_8);
 DigitalOut SENS_EN(D13);
 Si7021 tempHumSensor(PB_9, PB_8);
 RGBLed rgbled(PH_0, PH_1, PB_13);
+AnalogIn soil(PA_0);
 
 //Modes
 bool mode = true; //true = test mode, false = normal mode
@@ -52,6 +54,7 @@ float mean_temp = 0, max_temp = -1000, min_temp = 1000;
 float mean_hum = 0, max_hum = -1000, min_hum = 1000;
 unsigned short mean_light = 0, max_light = 0, min_light = 1000;
 float x_max = -1, x_min = 1, y_max = -1, y_min = 1, z_max = -1, z_min = 1;
+float mean_soil = 0, max_soil = -1000, min_soil = 1000;
 int samples = 4; //Each hour (3600) we measure each 30'', so we measure 3600/30 = 120 times per hour
 
 /*****************FUNCTIONS**************************/
@@ -85,7 +88,7 @@ void printValues(){
 	printf("TEMPERATURE: %1.1f C\n\r", temp_value);
   printf("HUMIDITY: %1.1f %\n\r", hum_value);
 	printf("LIGHT: %d %\n\r", light_value);
-	//printf("SOIL MOISTURE: %f\n\r", moisture_value);
+	printf("SOIL MOISTURE: %1.1f %\n\r", moisture_value);
 	//printf("GPS (time): ", gps_value);
 	printf("ACCELEROMETER: x = %f, y = %f, z = %f\n\r", x_value, y_value, z_value);
 	printf("COLOR SENSOR: clear = %i, red = %i, green = %i, blue = %i\n\r", clear, red, green, blue );
@@ -93,9 +96,7 @@ void printValues(){
 
 void monitoringValues(){
 	//LIGHT (%)
-	light_value = input.read_u16();
-	short a = (light_value * 100)/656; //We have set 656 as the 100% of the light since we have put the sensor under a lamp
-	light_value = a;
+	light_value = (input.read_u16() * 100)/656; //We have set 656 as the 100% of the light since we have put the sensor under a lamp
 	if(light_value>100){light_value = 100;} //In case it exceeds the max
 	
 	//ACCELEROMETER --------------------------------HE QUITADO EL ABS
@@ -122,6 +123,8 @@ void monitoringValues(){
 	clear = rgb_readings[0];
 	
 	//SOIL MOISTURE
+	moisture_value = (soil * 100)/0.8; //We have set 0.8 as the 100% of the soil moisture since we have done several measures
+	if(moisture_value>100){moisture_value = 100;} //In case it exceeds the max
 	
 	//GPS
 	
@@ -177,6 +180,9 @@ void resetVariables(){
 	y_min = 1;
 	z_max = -1;
 	z_min = 1;
+	mean_soil = 0;
+	max_soil = -1000;
+	min_soil = 1000;
 }
 int main(){
 	printf("Loading...");
@@ -218,12 +224,15 @@ int main(){
 				mean_temp += temp_value;
 				mean_hum += hum_value;
 				mean_light += light_value;
+				mean_soil += moisture_value;
 				max_temp = compareValuesMax(temp_value, max_temp);
 				min_temp = compareValuesMin(temp_value, min_temp);
 				max_hum = compareValuesMax(hum_value, max_hum);
 				min_hum = compareValuesMin(hum_value, min_hum);
 				max_light = compareValuesMax(light_value, max_light);
 				min_light = compareValuesMin(light_value, min_light);
+				max_soil = compareValuesMax(mean_soil, max_soil);
+				min_soil = compareValuesMax(mean_soil, min_soil);
 				x_max = compareValuesMax(x_value, x_max);
 				x_min = compareValuesMin(x_value, x_min);
 				y_max = compareValuesMax(y_value, y_max);
@@ -239,11 +248,13 @@ int main(){
 					mean_temp = mean_temp/(float)samples;
 					mean_hum = mean_hum/(float)samples;
 					mean_light = mean_light/samples;
+					mean_soil = mean_soil/(float)samples;
 					
 					//Mean, max, min
 					printf("TEMPERATURE PARAMETERS: MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_temp, max_temp, min_temp);
 					printf("HUMIDITY PARAMETERS (%): MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_hum, max_hum, min_hum);
 					printf("LIGHT PARAMETERS (%): MEAN %d, MAX: %d, MIN: %d\n", mean_light, max_light, min_light);
+					printf("SOIL MOISTURE PARAMETERS (%): MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_soil, max_soil, min_soil);
 					
 					printf("ACCEL PARAMETERS: X_MAX: %f, X_MIN: %f, Y_MAX: %f, Y_MIN: %f, Z_MAX: %f, Z_MIN: %f\n", x_max, x_min, y_max, y_min, z_max, z_min);
 					
@@ -261,11 +272,12 @@ int main(){
 				}
 				
 				
-				//soilmoisture
+
 				//global location of the plant each 30 secs
 				//limits the value of the measurements, if exceeds a led will notice (diff led for each measurement)
 				//gpsValues();
 				printf("\n\n\r");
+				//soilmoisture
 				//calculates mean, max, min of T, H, soil, light
 				//calculates max, min accel (x, y, z) each 1h
 				//printf the mean, max, min each 1h
