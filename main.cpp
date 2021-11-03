@@ -10,6 +10,8 @@
 #include "RGBLed.h"
 #include "MBed_Adafruit_GPS.h"
 
+using namespace std::chrono;
+
 /*****************VARIABLES**************************/
 //Sensors
 AnalogIn input(PA_4);
@@ -21,6 +23,8 @@ DigitalOut SENS_EN(D13);
 Si7021 tempHumSensor(PB_9, PB_8);
 RGBLed rgbled(PH_0, PH_1, PB_13);
 AnalogIn soil(PA_0);
+UnbufferedSerial *gps_Serial = new UnbufferedSerial(PA_9, PA_10,9600);
+Adafruit_GPS myGPS(gps_Serial); 
 
 //Modes
 bool mode = true; //true = test mode, false = normal mode
@@ -29,7 +33,7 @@ DigitalOut LED2_NormalMode (LED2);
 DigitalIn button(PB_2);
 bool button_pressed = false;
 Thread threadButton(osPriorityNormal, 512);
-Thread threadGPS(osPriorityNormal, 512);
+Thread threadGPS(osPriorityNormal, 2048);
 
 //Tickers
 Ticker ti_2sec;
@@ -41,6 +45,11 @@ bool isMonitoringTime30 = false;
 bool isMonitoringTime1 = false;
 
 int redtimes, greentimes, bluetimes;
+
+//GPS
+char c; //when read via Adafruit_GPS::read(), the class returns single character stored here
+Timer refresh_Timer; //sets up a timer for use in loop; how often do we print GPS info?
+const int refresh_Time = 2000; //refresh time in ms
 
 //Sensors values
 unsigned short light_value;
@@ -92,6 +101,11 @@ void printValues(){
 	//printf("GPS (time): ", gps_value);
 	printf("ACCELEROMETER: x = %f, y = %f, z = %f\n\r", x_value, y_value, z_value);
 	printf("COLOR SENSOR: clear = %i, red = %i, green = %i, blue = %i\n\r", clear, red, green, blue );
+	printf("Time: %d:%d:%d.%u\r\n", myGPS.hour, myGPS.minute, myGPS.seconds, myGPS.milliseconds);
+	printf("Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
+	printf("Quality: %d\r\n", (int) myGPS.fixquality);
+	printf("Location: %5.2f %c, %5.2f %c\r\n", myGPS.latitude, myGPS.lat, myGPS.longitude, myGPS.lon);
+
 }
 
 void monitoringValues(){
@@ -149,7 +163,33 @@ void dominantValue(){
 	}
 }
 void gpsValues(){
+
+	myGPS.sendCommand(PMTK_SET_NMEA_OUTPUT_GGA); //these commands are defined in MBed_Adafruit_GPS.h; a link is provided there for command creation
+	myGPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
+	myGPS.sendCommand(PGCMD_ANTENNA);
+
+	printf("Connection established at 9600 baud...\r\n");
+
+	//ThisThread::sleep_for(1s);
+
+	//refresh_Timer.start();  //starts the clock on the timer
 	
+	while(1){
+		
+		c = myGPS.read();   //queries the GPS
+
+//  if (c) { printf("%c", c); } //this line will echo the GPS data if not paused
+
+		//check if we recieved a new message from GPS, if so, attempt to parse it,
+		if ( myGPS.newNMEAreceived() ) {
+				if ( !myGPS.parse(myGPS.lastNMEA()) ) {
+						continue;
+				}
+		}
+
+		
+		
+	}
 }
 float compareValuesMax(float current_value, float max){
 	if(current_value > max) {return current_value;}
@@ -186,11 +226,16 @@ void resetVariables(){
 }
 int main(){
 	printf("Loading...");
+	myGPS.begin(9600);  //sets baud rate for GPS communication; note this may be changed via Adafruit_GPS::sendCommand(char *)
+                        //a list of GPS commands is available at http://www.adafruit.com/datasheets/PMTK_A08.pdf
 	threadButton.start(button_change);
+	threadGPS.start(gpsValues);
 	ti_2sec.attach_us(monitoringTime2, 2000000);
 	ti_30sec.attach_us(monitoringTime30, 5000000); //change to 30
 	ti_1h.attach_us(monitoringTime1, 20000000); //change to 1 hour
-		
+	
+	//gpsValues();
+	
 	while(1){
 		if(mode){
 			if(isMonitoringTime2){
@@ -199,8 +244,6 @@ int main(){
 				monitoringValues();
 				printValues();
 				dominantValue();
-				//soilmoisture
-				//gpsValues();
 				printf("\n\n\r");
 				//check connections
 				//measures each 2 secs
