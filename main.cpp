@@ -110,7 +110,7 @@ void printValues(){
 
 void monitoringValues(){
 	//LIGHT (%)
-	light_value = (input.read_u16() * 100)/656; //We have set 656 as the 100% of the light since we have put the sensor under a lamp
+	light_value = (input.read_u16() * 100)/2500; //We have set 2500 as the 100% of the light since we have put the sensor under a lamp
 	if(light_value>100){light_value = 100;} //In case it exceeds the max
 	
 	//ACCELEROMETER --------------------------------HE QUITADO EL ABS
@@ -191,6 +191,13 @@ void gpsValues(){
 		
 	}
 }
+
+void checkLimits(){
+	if(temp_value<-10){
+		rgbled.setColor(RGBLed::MAGENTA);
+	}
+}
+
 float compareValuesMax(float current_value, float max){
 	if(current_value > max) {return current_value;}
 	else{ return max;}
