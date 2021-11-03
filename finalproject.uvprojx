@@ -11238,6 +11238,21 @@
               <FileType>5</FileType>
               <FilePath>.\Si7021.h</FilePath>
             </File>
+            <File>
+              <FileName>RGBLed.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>.\RGBLed.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>RGBLed.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\RGBLed.h</FilePath>
+            </File>
+            <File>
+              <FileName>Si7021.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>.\Si7021.cpp</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
@@ -11249,5 +11264,14 @@
     <components/>
     <files/>
   </RTE>
+
+  <LayerInfo>
+    <Layers>
+      <Layer>
+        <LayName>finalproject</LayName>
+        <LayPrjMark>1</LayPrjMark>
+      </Layer>
+    </Layers>
+  </LayerInfo>
 
 </Project>
