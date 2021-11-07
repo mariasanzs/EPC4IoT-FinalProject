@@ -32,11 +32,11 @@ void RGBLed::setColor(Color& color) {
     _blue = color._b;
 }
  
-RGBLed::Color RGBLed::BLACK = RGBLed::Color(1,1,1);
-RGBLed::Color RGBLed::RED = RGBLed::Color(0,1,1);
-RGBLed::Color RGBLed::GREEN = RGBLed::Color(1,0,1);
-RGBLed::Color RGBLed::BLUE = RGBLed::Color(1,1,0);
-RGBLed::Color RGBLed::MAGENTA = RGBLed::Color(0,1,0);
-RGBLed::Color RGBLed::CYAN = RGBLed::Color(1,0,0);
-RGBLed::Color RGBLed::YELLOW = RGBLed::Color(0,0,1);
-RGBLed::Color RGBLed::WHITE = RGBLed::Color(0,0,0);
+RGBLed::Color RGBLed::WHITE = RGBLed::Color(1,1,1);
+RGBLed::Color RGBLed::CYAN = RGBLed::Color(0,1,1);
+RGBLed::Color RGBLed::YELLOW = RGBLed::Color(1,0,1);
+RGBLed::Color RGBLed::MAGENTA = RGBLed::Color(1,1,0);
+RGBLed::Color RGBLed::BLUE = RGBLed::Color(0,1,0);
+RGBLed::Color RGBLed::RED = RGBLed::Color(1,0,0);
+RGBLed::Color RGBLed::GREEN = RGBLed::Color(0,0,1);
+RGBLed::Color RGBLed::BLACK = RGBLed::Color(0,0,0);
