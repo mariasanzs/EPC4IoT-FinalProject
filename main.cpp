@@ -12,7 +12,7 @@
 
 //using namespace std::chrono;
 
-/*****************VARIABLES**************************/
+/***************************VARIABLES*****************************/
 //Sensors
 AnalogIn input(PA_4);
 AnalogIn soil(PA_0);
@@ -20,9 +20,6 @@ MMA8451Q acc(PB_9, PB_8, 0x1d<<1);
 TCS3472_I2C rgb_sensor (PB_9, PB_8);
 int rgb_readings[4];
 Si7021 tempHumSensor(PB_9, PB_8);
-DigitalOut greenLED(PH_1);
-DigitalOut redLED(PH_0);
-DigitalOut blueLED(PB_13);
 RGBLed rgbled(PH_0, PH_1, PB_13);
 UnbufferedSerial *gps_Serial = new UnbufferedSerial(PA_9, PA_10,9600);
 Adafruit_GPS myGPS(gps_Serial); 
@@ -38,27 +35,20 @@ bool button_pressed = false;
 Thread threadButton(osPriorityNormal, 512);
 Thread threadAnalog(osPriorityNormal, 512);
 Thread threadI2C(osPriorityNormal, 512);
-Thread threadGPS(osPriorityNormal, 2048);
-int wait_time;
 
 //Tickers
 Ticker ti_2sec;
 Ticker ti_30sec;
 Ticker ti_1h;
 
-bool isMonitoringTime2 = false;
-bool isMonitoringTime30 = false;
-bool isMonitoringTime1 = false;
+bool isMonitoringTime2 = false, isMonitoringTime30 = false, isMonitoringTime1 = false;
 
 int redtimes, greentimes, bluetimes;
 
 //GPS
-char c; //when read via Adafruit_GPS::read(), the class returns single character stored here
-Timer refresh_Timer; //sets up a timer for use in loop; how often do we print GPS info?
-const int refresh_Time = 2000; //refresh time in ms
-int hours, minutes, seconds, day, month, year, lat, lon;
+uint8_t hours, minutes, seconds, day, month, year;
+char lat, lon;
 float latitude, longitude;
-bool readGPS = false;
 
 //Sensors values
 unsigned short light_value;
@@ -75,7 +65,7 @@ float x_max = -1, x_min = 1, y_max = -1, y_min = 1, z_max = -1, z_min = 1;
 float mean_soil = 0, max_soil = -1000, min_soil = 1000;
 int samples = 4; //Each hour (3600) we measure each 30'', so we measure 3600/30 = 120 times per hour
 
-/*****************FUNCTIONS**************************/
+/***************************FUNCTIONS*****************************/
 void monitoringTime2(void){isMonitoringTime2 = true;}
 void monitoringTime30(void){isMonitoringTime30 = true;}
 void monitoringTime1(void){isMonitoringTime1 = true;}
@@ -112,7 +102,7 @@ void analogValues(void){
 }
 
 void i2cValues(void){
-	//ACCELEROMETER --------------------------------HE QUITADO EL ABS
+	//ACCELEROMETER
 	x_value = acc.getAccX();
 	y_value = acc.getAccY();
 	z_value = acc.getAccZ();
@@ -142,90 +132,77 @@ void printValues(){
 	printf("SOIL MOISTURE: %1.1f %\n\r", moisture_value);
 	printf("ACCELEROMETER: x = %f, y = %f, z = %f\n\r", x_value, y_value, z_value);
 	printf("COLOR SENSOR: clear = %i, red = %i, green = %i, blue = %i\n\r", clear, red, green, blue );
-	/*printf("Time: %d:%d:%d\r\n", hours, minutes, seconds);
-	printf("Date: %d/%d/20%d\r\n", day, month, year);
+	printf("Time: %d:%d:%d\r\n", myGPS.hour, myGPS.minute, myGPS.seconds);
+	printf("Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
 	printf("Quality: %d\r\n", (int) myGPS.fixquality);
 	printf("Location: %5.2f %c, %5.2f %c\r\n", latitude, lat, longitude, lon);
-	*/
+}
+void rgbLedTestMode(int color){
+	switch(color){
+		case 0:
+			rgbled.setColor(RGBLed::RED);
+			printf("RGB LED: RED\n");
+			break;
+		case 1:
+			rgbled.setColor(RGBLed::GREEN);
+			printf("RGB LED: GREEN\n");
+			break;
+		case 2:
+			rgbled.setColor(RGBLed::BLUE);
+			printf("RGB LED: BLUE\n");
+			break;
+	}
 }
 
 
-void rgbValue(){
-	// to print the dominant value and RGBLED:
+void dominantColour(){
 	if((red>green) && (red>blue)){
-		dominant_value = red;
-		rgbled.setColor(RGBLed::RED);
-		printf("RGB LED: RED\n");
+		dominant_value = 0;
 	}
 	else if( (green>red) && (green>blue)){ 
-		dominant_value = green;
-		rgbled.setColor(RGBLed::GREEN);
-		printf("RGB LED: GREEN\n");
+		dominant_value = 1;
 	}
 	else{ 
-		dominant_value = blue;
-		rgbled.setColor(RGBLed::BLUE);
-		printf("RGB LED: BLUE\n");
+		dominant_value = 2;
 	}
 }
-void gpsValues(void){
-
+void gpsInit(){
+	myGPS.begin(9600);
 	myGPS.sendCommand(PMTK_SET_NMEA_OUTPUT_GGA); //these commands are defined in MBed_Adafruit_GPS.h; a link is provided there for command creation
 	myGPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
 	myGPS.sendCommand(PGCMD_ANTENNA);
 	printf("Connection established at 9600 baud...\r\n");
-
-	while(1){
-		c = myGPS.read();
-		if ( myGPS.newNMEAreceived() ) {
-					if ( !myGPS.parse(myGPS.lastNMEA()) ) {
-							continue;
-					}
-		}
-		
-		readGPS = true;
-		if(readGPS && (isMonitoringTime30 || isMonitoringTime2)){
-			readGPS = false;
-			hours = myGPS.hour + 1;
-			minutes =	myGPS.minute;
-			seconds = myGPS.seconds;
-			day = myGPS.day;
-			month = myGPS.month;
-			year = myGPS.year;
-			latitude = myGPS.latitude;
-			longitude =  myGPS.longitude;
-			lat = myGPS.lat;
-			lon = myGPS.lon;
-			printf("Time: %d:%d:%d\r\n", hours, minutes, seconds);
-			printf("Date: %d/%d/20%d\r\n", day, month, year);
-			printf("Quality: %d\r\n", (int) myGPS.fixquality);
-			printf("Location: %5.2f %c, %5.2f %c\r\n", latitude, lat, longitude, lon);
-		}
-			
-	}
+	ThisThread::sleep_for(1s);	
 }
 
 void checkLimits(){
 	if(temp_value<-10 || temp_value>50){ //red
 		rgbled.setColor(RGBLed::RED);
+		printf("CHECK LIMITS: Temperature value exceeds the limits\n");
 	}
 	if(hum_value<25 || hum_value>75){ //blue
 		rgbled.setColor(RGBLed::BLUE);
+		printf("CHECK LIMITS: Humidity value exceeds the limits\n");
 	}
 	if(light_value<25 || light_value>75){ //green
 		rgbled.setColor(RGBLed::GREEN);
+		printf("CHECK LIMITS: Light value exceeds the limits\n");
 	}
 	if(moisture_value<25 || moisture_value>75){ //magenta (R,B)
 		rgbled.setColor(RGBLed::MAGENTA);
+		printf("CHECK LIMITS: Soil Moisture value exceeds the limits\n");
 	}
 	if(x_value>0.8){ //Yellow (G,R)
 		rgbled.setColor(RGBLed::YELLOW);
+		printf("CHECK LIMITS: X value exceeds the limit\n");
 	}
 	if(y_value<-0.8){ //Yellow (G,R)
 		rgbled.setColor(RGBLed::YELLOW);
+		printf("CHECK LIMITS: Y value exceeds the limit\n");
 	}
 	if(z_value>0.8){//Yellow (G,R)
 		rgbled.setColor(RGBLed::YELLOW);
+		printf("CHECK LIMITS: Z value exceeds the limit\n");
 	}
 }
 
@@ -264,15 +241,23 @@ void resetVariables(){
 }
 int main(){
 	printf("Loading...");
-	myGPS.begin(9600);  //sets baud rate for GPS communication; note this may be changed via Adafruit_GPS::sendCommand(char *)
-                        //a list of GPS commands is available at http://www.adafruit.com/datasheets/PMTK_A08.pdf
+
 	threadButton.start(button_change);
-	//threadGPS.start(gpsValues);
+	
+	gpsInit();
+	
 	ti_2sec.attach_us(monitoringTime2, 2000000);
 	ti_30sec.attach_us(monitoringTime30, 5000000); //change to 30
 	ti_1h.attach_us(monitoringTime1, 20000000); //change to 1 hour
 	
 	while(1){
+		myGPS.read();
+		if (myGPS.newNMEAreceived() ) {
+			if (!myGPS.parse(myGPS.lastNMEA()) ) {
+					continue;
+			}
+		}
+		
 		if(mode){
 			if(isMonitoringTime2){
 				printf("TEST MODE\n");
@@ -280,7 +265,8 @@ int main(){
 				threadAnalog.start(analogValues);
 				threadI2C.start(i2cValues);
 				printValues();
-				rgbValue();
+				dominantColour();
+				rgbLedTestMode(dominant_value);
 				printf("\n\n\r");
 				//PRINT GPS
 			}			
@@ -293,10 +279,11 @@ int main(){
 				threadI2C.start(i2cValues);
 				printValues();
 				checkLimits();
+				dominantColour();
 				//PRINT GPS
-				if(dominant_value == red){ redtimes++;}
-				if(dominant_value == green){ greentimes++;}
-				if(dominant_value == blue){ bluetimes++;}
+				if(dominant_value == 0){ redtimes++;}
+				if(dominant_value == 1){ greentimes++;}
+				if(dominant_value == 2){ bluetimes++;}
 				
 				//to calculate mean, max and min of T, H, Light + max, min 3axis Acc
 				mean_temp += temp_value;
@@ -329,13 +316,16 @@ int main(){
 					mean_soil = mean_soil/(float)samples;
 					
 					//Mean, max, min
-					printf("TEMPERATURE PARAMETERS: MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_temp, max_temp, min_temp);
+					printf("TEMPERATURE PARAMETERS (C): MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_temp, max_temp, min_temp);
 					printf("HUMIDITY PARAMETERS (%): MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_hum, max_hum, min_hum);
 					printf("LIGHT PARAMETERS (%): MEAN %d, MAX: %d, MIN: %d\n", mean_light, max_light, min_light);
 					printf("SOIL MOISTURE PARAMETERS (%): MEAN %1.1f, MAX: %1.1f, MIN: %1.1f\n", mean_soil, max_soil, min_soil);
 					
-					printf("ACCEL PARAMETERS: X_MAX: %f, X_MIN: %f, Y_MAX: %f, Y_MIN: %f, Z_MAX: %f, Z_MIN: %f\n", x_max, x_min, y_max, y_min, z_max, z_min);
-					
+					printf("ACCEL PARAMETERS: \n");
+					printf(" -- X: X_MAX: %f, X_MIN: %f\n", x_max, x_min);
+					printf(" -- Y: Y_MAX: %f, Y_MIN: %f\n", y_max, y_min);
+					printf(" -- Z: Z_MAX: %f, Z_MIN: %f\n", z_max, z_min);
+
 					//Dominant color as the one that appears the most in 1h
 					printf("NUMBER OF TIMES OF: Red: %d, Green: %d, Blue: %d", redtimes, greentimes, bluetimes);					
 					if(redtimes >= greentimes && redtimes >= bluetimes){
