@@ -21,7 +21,7 @@ TCS3472_I2C rgb_sensor (PB_9, PB_8);
 int rgb_readings[4];
 Si7021 tempHumSensor(PB_9, PB_8);
 RGBLed rgbled(PH_0, PH_1, PB_13);
-UnbufferedSerial *gps_Serial = new UnbufferedSerial(PA_9, PA_10,9600);
+BufferedSerial *gps_Serial = new BufferedSerial(PA_9, PA_10,9600);
 Adafruit_GPS myGPS(gps_Serial); 
 
 //Modes
@@ -172,7 +172,8 @@ void gpsInit(){
 	myGPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
 	myGPS.sendCommand(PGCMD_ANTENNA);
 	printf("Connection established at 9600 baud...\r\n");
-	ThisThread::sleep_for(1s);	
+	//ThisThread::sleep_for(1s);	
+	wait_us(1000000);
 }
 
 void checkLimits(){

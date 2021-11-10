@@ -75,7 +75,7 @@ class Adafruit_GPS : public Stream
 public:
   void begin(int baud); 
 
-  Adafruit_GPS(UnbufferedSerial * ser);
+  Adafruit_GPS(BufferedSerial * ser);
 
   char *lastNMEA(void);
   bool newNMEAreceived();
@@ -110,7 +110,7 @@ public:
 
  private:
   bool paused;  
-  UnbufferedSerial *gpsSerial;
+  BufferedSerial *gpsSerial;
 
 protected:
   virtual int _putc(int value);
