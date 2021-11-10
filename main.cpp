@@ -35,6 +35,7 @@ bool button_pressed = false;
 Thread threadButton(osPriorityNormal, 512);
 Thread threadAnalog(osPriorityNormal, 512);
 Thread threadI2C(osPriorityNormal, 512);
+Thread threadGPS(osPriorityNormal, 2048);
 
 //Tickers
 Ticker ti_2sec;
@@ -44,11 +45,6 @@ Ticker ti_1h;
 bool isMonitoringTime2 = false, isMonitoringTime30 = false, isMonitoringTime1 = false;
 
 int redtimes, greentimes, bluetimes;
-
-//GPS
-uint8_t hours, minutes, seconds, day, month, year;
-char lat, lon;
-float latitude, longitude;
 
 //Sensors values
 unsigned short light_value;
@@ -70,6 +66,7 @@ void monitoringTime2(void){isMonitoringTime2 = true;}
 void monitoringTime30(void){isMonitoringTime30 = true;}
 void monitoringTime1(void){isMonitoringTime1 = true;}
 
+///////////THREADS//////////////
 void button_change(void){
 	while(1){
 		if(button){
@@ -100,7 +97,16 @@ void analogValues(void){
 	moisture_value = (soil * 100)/0.8; //We have set 0.8 as the 100% of the soil moisture since we have done several measures
 	if(moisture_value>100){moisture_value = 100;} //In case it exceeds the max
 }
-
+void gpsValues(void){
+	while(1){
+		myGPS.read();
+		if (myGPS.newNMEAreceived() ) {
+			if (!myGPS.parse(myGPS.lastNMEA()) ) {
+					continue;
+			}
+		}
+	}
+}
 void i2cValues(void){
 	//ACCELEROMETER
 	x_value = acc.getAccX();
@@ -125,6 +131,8 @@ void i2cValues(void){
 	blue = rgb_readings[2];
 	clear = rgb_readings[3];
 }
+////////////END THREADS////////////
+
 void printValues(){
 	printf("TEMPERATURE: %1.1f C\n\r", temp_value);
   printf("HUMIDITY: %1.1f %\n\r", hum_value);
@@ -132,11 +140,25 @@ void printValues(){
 	printf("SOIL MOISTURE: %1.1f %\n\r", moisture_value);
 	printf("ACCELEROMETER: x = %f, y = %f, z = %f\n\r", x_value, y_value, z_value);
 	printf("COLOR SENSOR: clear = %i, red = %i, green = %i, blue = %i\n\r", clear, red, green, blue );
-	printf("Time: %d:%d:%d\r\n", myGPS.hour, myGPS.minute, myGPS.seconds);
-	printf("Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
-	printf("Quality: %d\r\n", (int) myGPS.fixquality);
-	printf("Location: %5.2f %c, %5.2f %c\r\n", latitude, lat, longitude, lon);
+	printf("GPS VALUES: \n");
+	printf("-- Time: %d:%d:%d\r\n", myGPS.hour, myGPS.minute, myGPS.seconds);
+	printf("-- Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
+	printf("-- Quality: %d\r\n", (int) myGPS.fixquality);
+	printf("-- Location: %5.2f %c, %5.2f %c\r\n", myGPS.latitude, myGPS.lat, myGPS.longitude, myGPS.lon);
 }
+
+void dominantColour(){
+	if((red>green) && (red>blue)){
+		dominant_value = 0;
+	}
+	else if( (green>red) && (green>blue)){ 
+		dominant_value = 1;
+	}
+	else{ 
+		dominant_value = 2;
+	}
+}
+
 void rgbLedTestMode(int color){
 	switch(color){
 		case 0:
@@ -154,25 +176,12 @@ void rgbLedTestMode(int color){
 	}
 }
 
-
-void dominantColour(){
-	if((red>green) && (red>blue)){
-		dominant_value = 0;
-	}
-	else if( (green>red) && (green>blue)){ 
-		dominant_value = 1;
-	}
-	else{ 
-		dominant_value = 2;
-	}
-}
 void gpsInit(){
 	myGPS.begin(9600);
 	myGPS.sendCommand(PMTK_SET_NMEA_OUTPUT_GGA); //these commands are defined in MBed_Adafruit_GPS.h; a link is provided there for command creation
 	myGPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
 	myGPS.sendCommand(PGCMD_ANTENNA);
 	printf("Connection established at 9600 baud...\r\n");
-	//ThisThread::sleep_for(1s);	
 	wait_us(1000000);
 }
 
@@ -240,25 +249,20 @@ void resetVariables(){
 	max_soil = -1000;
 	min_soil = 1000;
 }
+
 int main(){
 	printf("Loading...");
 
 	threadButton.start(button_change);
-	
+	threadGPS.start(gpsValues);
 	gpsInit();
 	
 	ti_2sec.attach_us(monitoringTime2, 2000000);
 	ti_30sec.attach_us(monitoringTime30, 5000000); //change to 30
 	ti_1h.attach_us(monitoringTime1, 20000000); //change to 1 hour
 	
-	while(1){
-		myGPS.read();
-		if (myGPS.newNMEAreceived() ) {
-			if (!myGPS.parse(myGPS.lastNMEA()) ) {
-					continue;
-			}
-		}
-		
+	
+	while(1){		
 		if(mode){
 			if(isMonitoringTime2){
 				printf("TEST MODE\n");
@@ -269,9 +273,7 @@ int main(){
 				dominantColour();
 				rgbLedTestMode(dominant_value);
 				printf("\n\n\r");
-				//PRINT GPS
 			}			
-		
 		}else{
 			if(isMonitoringTime30){
 				printf("NORMAL MODE\n");
@@ -281,7 +283,7 @@ int main(){
 				printValues();
 				checkLimits();
 				dominantColour();
-				//PRINT GPS
+
 				if(dominant_value == 0){ redtimes++;}
 				if(dominant_value == 1){ greentimes++;}
 				if(dominant_value == 2){ bluetimes++;}
