@@ -25,17 +25,18 @@ BufferedSerial *gps_Serial = new BufferedSerial(PA_9, PA_10,9600);
 Adafruit_GPS myGPS(gps_Serial); 
 
 //Modes
-bool mode = true; //true = test mode, false = normal mode
+bool mode = false; //true = test mode, false = normal mode
 DigitalOut LED1_TestMode (LED1); 
 DigitalOut LED2_NormalMode (LED2);
-DigitalIn button(PB_2);
-bool button_pressed = false;
+InterruptIn button(PB_2, PullDown);
+//DigitalIn button(PB_2);
+
 
 //Threads
-Thread threadButton(osPriorityNormal, 512);
 Thread threadAnalog(osPriorityNormal, 512);
 Thread threadI2C(osPriorityNormal, 512);
 Thread threadGPS(osPriorityNormal, 2048);
+int wait_time = 2000000;
 
 //Tickers
 Ticker ti_2sec;
@@ -65,37 +66,22 @@ int samples = 4; //Each hour (3600) we measure each 30'', so we measure 3600/30 
 void monitoringTime2(void){isMonitoringTime2 = true;}
 void monitoringTime30(void){isMonitoringTime30 = true;}
 void monitoringTime1(void){isMonitoringTime1 = true;}
+void pressButton(void){mode = !mode;}
 
 ///////////THREADS//////////////
-void button_change(void){
-	while(1){
-		if(button){
-			if(!button_pressed){
-				button_pressed = true;
-				printf("Changing mode...\n");
-				mode =! mode;
-				if(mode){
-					LED1_TestMode = 1;
-					LED2_NormalMode = 0;
-				}else{
-					LED1_TestMode = 0;
-					LED2_NormalMode = 1;
-				}
-				printf("Mode: %s\n", mode ? "TEST MODE" : "NORMAL MODE");
-			}
-		}else{
-				button_pressed = false;
-		}
-	}
-}
 void analogValues(void){
-	//LIGHT (%)
-	light_value = (input.read_u16() * 100)/2500; //We have set 2500 as the 100% of the light since we have put the sensor under a lamp
-	if(light_value>100){light_value = 100;} //In case it exceeds the max
+	while (1){
+		//LIGHT (%)
+		light_value = input.read_u16();
+		/*light_value = (input.read_u16() * 100)/2500; //We have set 2500 as the 100% of the light since we have put the sensor under a lamp
+		if(light_value>100){light_value = 100;} //In case it exceeds the max*/
 
-	//SOIL MOISTURE
-	moisture_value = (soil * 100)/0.8; //We have set 0.8 as the 100% of the soil moisture since we have done several measures
-	if(moisture_value>100){moisture_value = 100;} //In case it exceeds the max
+		//SOIL MOISTURE
+		moisture_value = soil;
+		/*moisture_value = (soil * 100)/0.8; //We have set 0.8 as the 100% of the soil moisture since we have done several measures
+		if(moisture_value>100){moisture_value = 100;} //In case it exceeds the max*/
+		wait_us(wait_time);
+	}
 }
 void gpsValues(void){
 	while(1){
@@ -106,30 +92,35 @@ void gpsValues(void){
 			}
 		}
 	}
+	wait_us(wait_time);
 }
 void i2cValues(void){
-	//ACCELEROMETER
-	x_value = acc.getAccX();
-	y_value = acc.getAccY();
-	z_value = acc.getAccZ();
-	
-	//TEMPERATURE
-	tempHumSensor.get_data();
-	temp_value = tempHumSensor.get_temperature();
-	temp_value = temp_value/1000;
-	
-	//HUMIDITY (%)
-	hum_value = tempHumSensor.get_humidity();
-	hum_value = hum_value/1000;
-	
-	//RGB SENSOR
-	rgb_sensor.enablePowerAndRGBC(); 
-  rgb_sensor.setIntegrationTime( 100 ); 
-	rgb_sensor.getAllColors( rgb_readings );
-	red = rgb_readings[0];
-	green = rgb_readings[1];
-	blue = rgb_readings[2];
-	clear = rgb_readings[3];
+	while (1){
+		//ACCELEROMETER
+		x_value = acc.getAccX();
+		y_value = acc.getAccY();
+		z_value = acc.getAccZ();
+		
+		//TEMPERATURE
+		tempHumSensor.get_data();
+		temp_value = tempHumSensor.get_temperature();
+		temp_value = temp_value/1000;
+		
+		//HUMIDITY (%)
+		hum_value = tempHumSensor.get_humidity();
+		hum_value = hum_value/1000;
+		
+		//RGB SENSOR
+		rgb_sensor.enablePowerAndRGBC(); 
+		rgb_sensor.setIntegrationTime( 100 ); 
+		rgb_sensor.getAllColors( rgb_readings );
+		red = rgb_readings[0];
+		green = rgb_readings[1];
+		blue = rgb_readings[2];
+		clear = rgb_readings[3];
+		
+		wait_us(wait_time);
+	}
 }
 ////////////END THREADS////////////
 
@@ -141,7 +132,7 @@ void printValues(){
 	printf("ACCELEROMETER: x = %f, y = %f, z = %f\n\r", x_value, y_value, z_value);
 	printf("COLOR SENSOR: clear = %i, red = %i, green = %i, blue = %i\n\r", clear, red, green, blue );
 	printf("GPS VALUES: \n");
-	printf("-- Time: %d:%d:%d\r\n", myGPS.hour, myGPS.minute, myGPS.seconds);
+	printf("-- Time: %d:%d:%d\r\n", myGPS.hour + 1, myGPS.minute, myGPS.seconds);
 	printf("-- Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
 	printf("-- Quality: %d\r\n", (int) myGPS.fixquality);
 	printf("-- Location: %5.2f %c, %5.2f %c\r\n", myGPS.latitude, myGPS.lat, myGPS.longitude, myGPS.lon);
@@ -249,26 +240,38 @@ void resetVariables(){
 	max_soil = -1000;
 	min_soil = 1000;
 }
-
+void switchLed(){
+	if(mode){
+		LED1_TestMode = true;
+		LED2_NormalMode = false;
+	}else{
+		LED1_TestMode = false;
+		LED2_NormalMode = true;
+	}
+}
 int main(){
 	printf("Loading...");
-
-	threadButton.start(button_change);
-	threadGPS.start(gpsValues);
 	gpsInit();
+	
+	threadGPS.start(gpsValues);
+	threadAnalog.start(analogValues);
+	threadI2C.start(i2cValues);
 	
 	ti_2sec.attach_us(monitoringTime2, 2000000);
 	ti_30sec.attach_us(monitoringTime30, 5000000); //change to 30
 	ti_1h.attach_us(monitoringTime1, 20000000); //change to 1 hour
 	
+	button.mode(PullDown);
+	button.fall(pressButton);
 	
-	while(1){		
+	while(1){
+		switchLed();
+			
 		if(mode){
 			if(isMonitoringTime2){
+				wait_time = 2000000;
 				printf("TEST MODE\n");
 				isMonitoringTime2 = false;
-				threadAnalog.start(analogValues);
-				threadI2C.start(i2cValues);
 				printValues();
 				dominantColour();
 				rgbLedTestMode(dominant_value);
@@ -276,10 +279,9 @@ int main(){
 			}			
 		}else{
 			if(isMonitoringTime30){
+				wait_time = 5000000;
 				printf("NORMAL MODE\n");
 				isMonitoringTime30 = false;
-				threadAnalog.start(analogValues);
-				threadI2C.start(i2cValues);
 				printValues();
 				checkLimits();
 				dominantColour();
