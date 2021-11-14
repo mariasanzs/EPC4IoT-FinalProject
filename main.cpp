@@ -29,8 +29,6 @@ bool mode = false; //true = test mode, false = normal mode
 DigitalOut LED1_TestMode (LED1); 
 DigitalOut LED2_NormalMode (LED2);
 InterruptIn button(PB_2, PullDown);
-//DigitalIn button(PB_2);
-
 
 //Threads
 Thread threadAnalog(osPriorityNormal, 512);
@@ -51,8 +49,7 @@ int redtimes, greentimes, bluetimes;
 unsigned short light_value;
 float x_value, y_value, z_value, moisture_value;
 int dominant_value, clear, red, green, blue;
-float temp_value;
-float hum_value;
+float temp_value, hum_value;
 
 //Mean, max, min
 float mean_temp = 0, max_temp = -1000, min_temp = 1000;
@@ -72,18 +69,17 @@ void pressButton(void){mode = !mode;}
 void analogValues(void){
 	while (1){
 		//LIGHT (%)
-		light_value = input.read_u16();
-		/*light_value = (input.read_u16() * 100)/2500; //We have set 2500 as the 100% of the light since we have put the sensor under a lamp
-		if(light_value>100){light_value = 100;} //In case it exceeds the max*/
+		light_value = (input.read_u16() * 100)/3100; //We have set 3100 as the 100% of the light since we have put the sensor under a lamp
+		if(light_value>100){light_value = 100;} //In case it exceeds the max
 
 		//SOIL MOISTURE
-		moisture_value = soil;
+		moisture_value = soil * 100;
 		/*moisture_value = (soil * 100)/0.8; //We have set 0.8 as the 100% of the soil moisture since we have done several measures
 		if(moisture_value>100){moisture_value = 100;} //In case it exceeds the max*/
 		wait_us(wait_time);
 	}
 }
-void gpsValues(void){
+void gpsRead(void){
 	while(1){
 		myGPS.read();
 		if (myGPS.newNMEAreceived() ) {
@@ -134,8 +130,9 @@ void printValues(){
 	printf("GPS VALUES: \n");
 	printf("-- Time: %d:%d:%d\r\n", myGPS.hour + 1, myGPS.minute, myGPS.seconds);
 	printf("-- Date: %d/%d/20%d\r\n", myGPS.day, myGPS.month, myGPS.year);
-	printf("-- Quality: %d\r\n", (int) myGPS.fixquality);
-	printf("-- Location: %5.2f %c, %5.2f %c\r\n", myGPS.latitude, myGPS.lat, myGPS.longitude, myGPS.lon);
+	printf("-- Quality: %i\r\n", (int) myGPS.fixquality);
+	printf("-- Location convert: %5.2f %c, %5.2f %c\r\n", myGPS.latitude/100, myGPS.lat, myGPS.longitude/100, myGPS.lon);
+	printf("-- Location sin convert: %5.2f %c, %5.2f %c\r\n", myGPS.latitude, myGPS.lat, myGPS.longitude, myGPS.lon);
 }
 
 void dominantColour(){
@@ -177,19 +174,19 @@ void gpsInit(){
 }
 
 void checkLimits(){
-	if(temp_value<-10 || temp_value>50){ //red
+	if(temp_value>25){ //red
 		rgbled.setColor(RGBLed::RED);
 		printf("CHECK LIMITS: Temperature value exceeds the limits\n");
 	}
-	if(hum_value<25 || hum_value>75){ //blue
+	if(hum_value>70){ //blue
 		rgbled.setColor(RGBLed::BLUE);
 		printf("CHECK LIMITS: Humidity value exceeds the limits\n");
 	}
-	if(light_value<25 || light_value>75){ //green
+	if(light_value<10 || light_value>85){ //green
 		rgbled.setColor(RGBLed::GREEN);
 		printf("CHECK LIMITS: Light value exceeds the limits\n");
 	}
-	if(moisture_value<25 || moisture_value>75){ //magenta (R,B)
+	if(moisture_value>75){ //magenta (R,B)
 		rgbled.setColor(RGBLed::MAGENTA);
 		printf("CHECK LIMITS: Soil Moisture value exceeds the limits\n");
 	}
@@ -197,7 +194,7 @@ void checkLimits(){
 		rgbled.setColor(RGBLed::YELLOW);
 		printf("CHECK LIMITS: X value exceeds the limit\n");
 	}
-	if(y_value<-0.8){ //Yellow (G,R)
+	if(y_value>0.8){ //Yellow (G,R)
 		rgbled.setColor(RGBLed::YELLOW);
 		printf("CHECK LIMITS: Y value exceeds the limit\n");
 	}
@@ -215,6 +212,7 @@ float compareValuesMin(float current_value, float min){
 	if(current_value < min) {return current_value;}
 	else{ return min;}
 }
+
 
 void resetVariables(){
 	printf("RESET VARIABLES\n");
@@ -250,15 +248,15 @@ void switchLed(){
 	}
 }
 int main(){
-	printf("Loading...");
+	printf("Loading...\n");
 	gpsInit();
 	
-	threadGPS.start(gpsValues);
+	threadGPS.start(gpsRead);
 	threadAnalog.start(analogValues);
 	threadI2C.start(i2cValues);
 	
 	ti_2sec.attach_us(monitoringTime2, 2000000);
-	ti_30sec.attach_us(monitoringTime30, 5000000); //change to 30
+	ti_30sec.attach_us(monitoringTime30, 30000000); 
 	ti_1h.attach_us(monitoringTime1, 20000000); //change to 1 hour
 	
 	button.mode(PullDown);
@@ -279,7 +277,7 @@ int main(){
 			}			
 		}else{
 			if(isMonitoringTime30){
-				wait_time = 5000000;
+				wait_time = 30000000;
 				printf("NORMAL MODE\n");
 				isMonitoringTime30 = false;
 				printValues();
