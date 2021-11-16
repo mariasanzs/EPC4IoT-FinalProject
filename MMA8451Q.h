@@ -98,7 +98,7 @@ public:
    */
   void getAccAllAxis(float * res);
  
-private:
+public:
   I2C m_i2c;
   int m_addr;
   void readRegs(int addr, uint8_t * data, int len);

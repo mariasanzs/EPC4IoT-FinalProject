@@ -22,27 +22,6 @@
  
 #include "mbed.h"
  
-/** A  light RGB LED Class \n
-    Warning : This library is for non-PWN LED \n
-    Here is an quick hello-world class that makes the LED blink with all colors. \n
-    @code
-    #include "mbed.h"
-    #include "RGBLed.h"
- 
-    RGBLed led(LED_RED, LED_GREEN, LED_BLUE);
- 
-    int main() {
-        RGBLed::Color list[8] = {RGBLed::BLACK, RGBLed::RED, RGBLed::GREEN, RGBLed::BLUE, RGBLed::MAGENTA, RGBLed::CYAN, RGBLed::YELLOW, RGBLed::WHITE};
-        int i = 0;
- 
-        while (true) {
-            i = (i+1)%8;
-            led.setColor(list[i]);
-            wait_ms(100);
-        }
-    }
-    @endcode
-*/
 class RGBLed {
 private:
     DigitalOut _red;

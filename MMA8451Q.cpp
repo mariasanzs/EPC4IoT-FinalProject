@@ -23,9 +23,12 @@
 #define REG_OUT_X_MSB     0x01
 #define REG_OUT_Y_MSB     0x03
 #define REG_OUT_Z_MSB     0x05
+#define REG_PULSE_SRC			0x22
+#define REG_SIST_INTER		0x0C
  
 #define UINT14_MAX        16383
  
+
 MMA8451Q::MMA8451Q(PinName sda, PinName scl, int addr) : m_i2c(sda, scl), m_addr(addr) {
     // activate the peripheral
     uint8_t data[2] = {REG_CTRL_REG_1, 0x01};
@@ -34,11 +37,6 @@ MMA8451Q::MMA8451Q(PinName sda, PinName scl, int addr) : m_i2c(sda, scl), m_addr
  
 MMA8451Q::~MMA8451Q() { }
  
-uint8_t MMA8451Q::getWhoAmI() {
-    uint8_t who_am_i = 0;
-    readRegs(REG_WHO_AM_I, &who_am_i, 1);
-    return who_am_i;
-}
  
 float MMA8451Q::getAccX() {
     return (float(getAccAxis(REG_OUT_X_MSB))/4096.0);
