@@ -29,7 +29,7 @@ int mode; //0 = test mode, 1 = normal mode, 2 = advanced mode
 DigitalOut LED1_TestMode (LED1); 
 DigitalOut LED2_NormalMode (LED2);
 DigitalOut LED3_AdvancedMode (LED3);
-InterruptIn button(PB_2, PullDown);
+InterruptIn button(PB_2);
 bool isButtonPressed = false;
 
 //Threads
@@ -71,7 +71,7 @@ void analogValues(void){
 	while (1){
 		//LIGHT (%)
 		light_value = (input_light.read_u16() * 100)/4000; 
-		if(light_value>100){light_value = 100;} //In case it exceeds the max
+		if(light_value>100){light_value = 100;} 
 		
 		//SOIL MOISTURE
 		moisture_value = soil * 100;
@@ -276,7 +276,6 @@ int main(){
 	ti_30sec.attach_us(monitoringTime30, 30000000); 
 	ti_1h.attach_us(monitoringTime1, 3600000000);
 	
-	button.mode(PullDown);
 	button.fall(pressButton);
 	
 	while(1){
